@@ -11,7 +11,7 @@ import json
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'habitflow_secret_2024')
  
-DB_PATH = os.environ.get('DB_PATH', 'habit_data.db')
+DB_PATH = os.environ.get('DB_PATH', '/tmp/habit_data.db')
  
 QUOTES = [
     {"text": "Success is the sum of small efforts repeated daily.", "author": "Robert Collier"},
@@ -397,6 +397,6 @@ def toggle_habit():
     return jsonify({'success': True, 'status': new_status, 'streak': streak})
  
 init_db()
-
+ 
 if __name__ == '__main__':
     app.run(debug=True)
