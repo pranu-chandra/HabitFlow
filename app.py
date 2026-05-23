@@ -396,6 +396,7 @@ def toggle_habit():
     streak = calculate_habit_streak(habit_id, session['user_id'])
     return jsonify({'success': True, 'status': new_status, 'streak': streak})
  
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True)
