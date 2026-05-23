@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HabitFlow{% endblock %}
+
+{% block extra_head %}
+<style>
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 960px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+/* HEADER */
+.dash-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.75rem; flex-wrap: gap;
+}
+.dash-greeting { font-family: 'Syne', sans-serif; font-size: 1.55rem; font-weight: 800; line-height: 1.2; }
+.dash-greeting span { color: var(--accent); }
+.dash-date { font-size: 0.82rem; color: var(--text3); margin-top: 2px; }
+
+/* DAILY RING */
+.daily-progress-wrap {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+.ring-svg { flex-shrink: 0; }
+.ring-track { fill: none; stroke: var(--bg3); stroke-width: 8; }
+.ring-fill {
+    fill: none; stroke: var(--accent); stroke-width: 8;
+    stroke-linecap: round;
+    transform: rotate(-90deg); transform-origin: 50% 50%;
+    transition: stroke-dashoffset 1s ease;
+    filter: drop-shadow(0 0 6px rgba(94,234,212,0.5));
+}
+.ring-center { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 800; fill: var(--text); }
+.ring-center-sub { font-size: 0.28rem; fill: var(--text3); font-family: 'DM Sans', sans-serif; font-weight: 400; }
+.daily-info { flex: 1; }
+.daily-label { font-size: 0.78rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.daily-main { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin: 2px 0; }
+.daily-sub { font-size: 0.82rem; color: var(--text2); }
+
+/* HABIT CARDS */
+.habits-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.habit-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: 1rem;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative; overflow: hidden;
+}
+.habit-card:hover { border-color: var(--border2); transform: translateX(2px); }
+.habit-card.done { border-color: rgba(94,234,212,0.2); background: rgba(94,234,212,0.03); }
+.habit-accent-bar {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 3px 0 0 3px;
+}
+.habit-icon-wrap {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; background: var(--bg3);
+}
+.habit-info { flex: 1; min-width: 0; }
+.habit-name {
+    font-weight: 600; font-size: 0.95rem; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.habit-name.crossed { text-decoration: line-through; color: var(--text3); }
+.habit-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 3px; }
+.habit-streak { font-size: 0.78rem; color: var(--text2); display: flex; align-items: center; gap: 3px; }
+.habit-streak b { color: var(--gold); }
+.habit-rate { font-size: 0.78rem; color: var(--text2); }
+.habit-rate b { color: var(--accent2); }
+.habit-cat-badge {
+    font-size: 0.68rem; padding: 0.15rem 0.5rem;
+    border-radius: 99px; font-weight: 600;
+    background: var(--bg3); color: var(--text3);
+}
+.habit-actions { display: flex; align-items: center; gap: 0.5rem; }
+.check-btn {
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 2px solid var(--border2); background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; font-size: 1rem;
+    color: var(--text3);
+}
+.check-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(94,234,212,0.1); }
+.check-btn.done {
+    background: var(--accent); border-color: var(--accent);
+    color: #050d10; box-shadow: 0 0 16px rgba(94,234,212,0.4);
+}
+.habit-menu-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: none; background: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text3); transition: all 0.2s; font-size: 1rem;
+}
+.habit-menu-btn:hover { background: var(--surface2); color: var(--text); }
+.empty-state {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--text3);
+}
+.empty-state .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state p { font-size: 0.9rem; line-height: 1.6; }
+
+/* SIDEBAR */
+.sidebar { display: flex; flex-direction: column; gap: 1rem; }
+.quote-card {
+    background: linear-gradient(135deg, rgba(94,234,212,0.08), rgba(129,140,248,0.08));
+    border: 1px solid rgba(94,234,212,0.15);
+    border-radius: 14px; padding: 1.25rem;
+}
+.quote-mark { font-size: 2rem; color: var(--accent); line-height: 1; opacity: 0.4; margin-bottom: 0.25rem; }
+.quote-text { font-size: 0.88rem; color: var(--text); line-height: 1.6; font-style: italic; margin-bottom: 0.5rem; }
+.quote-author { font-size: 0.75rem; color: var(--text3); font-weight: 500; }
+.mini-chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+.mini-chart-title { font-size: 0.82rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 0.75rem; }
+
+/* HEATMAP */
+.heatmap-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+.heatmap-grid { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+.heatmap-cell {
+    width: 11px; height: 11px; border-radius: 2px;
+    background: var(--bg3); transition: background 0.2s;
+    cursor: pointer; flex-shrink: 0;
+}
+.heatmap-cell:hover { opacity: 0.8; }
+.heatmap-cell.l1 { background: rgba(94,234,212,0.2); }
+.heatmap-cell.l2 { background: rgba(94,234,212,0.45); }
+.heatmap-cell.l3 { background: rgba(94,234,212,0.7); }
+.heatmap-cell.l4 { background: var(--accent); }
+
+/* ADD HABIT FORM */
+.add-habit-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+.add-habit-card .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="dash-header fade-up">
+        <div>
+            <div class="dash-greeting">Good {% if now_hour < 12 %}morning{% elif now_hour < 17 %}afternoon{% else %}evening{% endif %}, <span>{{ username }}</span> 👋</div>
+            <div class="dash-date" id="todayDate"></div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('addHabitModal')">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            New Habit
+        </button>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid fade-up fade-up-d1">
+        <div class="stat-card teal">
+            <div class="stat-label">Today</div>
+            <div class="stat-value" style="color:var(--accent)">{{ done_today }}<span style="font-size:1rem;color:var(--text3)">/{{ total_habits }}</span></div>
+            <div class="stat-sub">habits completed</div>
+        </div>
+        <div class="stat-card purple">
+            <div class="stat-label">Completion</div>
+            <div class="stat-value" style="color:var(--accent2)">{{ completion_pct }}<span style="font-size:1rem">%</span></div>
+            <div class="stat-sub">today's rate</div>
+        </div>
+        <div class="stat-card gold">
+            <div class="stat-label">Streaks</div>
+            <div class="stat-value" style="color:var(--gold)">{{ total_streak }}</div>
+            <div class="stat-sub">combined days</div>
+        </div>
+        <div class="stat-card pink">
+            <div class="stat-label">All Time</div>
+            <div class="stat-value" style="color:var(--accent3)">{{ total_done }}</div>
+            <div class="stat-sub">completions</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- LEFT: Habits -->
+        <div>
+            <!-- Daily Ring Progress -->
+            <div class="daily-progress-wrap fade-up fade-up-d2">
+                <svg class="ring-svg" width="72" height="72" viewBox="0 0 72 72">
+                    <circle class="ring-track" cx="36" cy="36" r="28"/>
+                    <circle class="ring-fill" cx="36" cy="36" r="28"
+                        id="ringFill"
+                        stroke-dasharray="175.9"
+                        stroke-dashoffset="175.9"/>
+                    <text x="36" y="33" text-anchor="middle" class="ring-center" id="ringPct">0%</text>
+                    <text x="36" y="43" text-anchor="middle" class="ring-center-sub">today</text>
+                </svg>
+                <div class="daily-info">
+                    <div class="daily-label">Daily Progress</div>
+                    <div class="daily-main">{{ done_today }} of {{ total_habits }} done</div>
+                    <div class="daily-sub">
+                        {% if completion_pct == 100 %}🎉 Perfect day! All habits done!
+                        {% elif completion_pct >= 50 %}Keep going, you're past halfway!
+                        {% elif total_habits == 0 %}Add your first habit to get started
+                        {% else %}{{ total_habits - done_today }} habit{{ 's' if (total_habits - done_today) != 1 }} remaining{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Habits List -->
+            <div class="section-header fade-up fade-up-d3">
+                <div class="section-title">Today's Habits</div>
+                <div class="section-sub">{{ today }}</div>
+            </div>
+
+            <div class="habits-list fade-up fade-up-d4" id="habitsList">
+                {% if habits %}
+                    {% for h in habits %}
+                    <div class="habit-card {% if h.done_today %}done{% endif %}" id="habit-{{ h.id }}" data-id="{{ h.id }}">
+                        <div class="habit-accent-bar" style="background:{{ h.color }}"></div>
+                        <div class="habit-icon-wrap" style="background:{{ h.color }}22">{{ h.icon }}</div>
+                        <div class="habit-info">
+                            <div class="habit-name {% if h.done_today %}crossed{% endif %}" id="hname-{{ h.id }}">{{ h.name }}</div>
+                            <div class="habit-meta">
+                                <span class="habit-streak">🔥 <b>{{ h.streak }}</b> day streak</span>
+                                <span class="habit-rate">📊 <b>{{ h.rate }}%</b> (30d)</span>
+                                <span class="habit-cat-badge">{{ h.category }}</span>
+                            </div>
+                        </div>
+                        <div class="habit-actions">
+                            <button class="check-btn {% if h.done_today %}done{% endif %}"
+                                id="check-{{ h.id }}"
+                                onclick="toggleHabit({{ h.id }})"
+                                title="{% if h.done_today %}Mark incomplete{% else %}Mark complete{% endif %}">
+                                {% if h.done_today %}✓{% else %}○{% endif %}
+                            </button>
+                            <button class="habit-menu-btn" onclick="confirmDelete({{ h.id }}, '{{ h.name }}')" title="Remove habit">✕</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">🌱</div>
+                    <p>No habits yet.<br>Add your first one to start your journey!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- RIGHT: Sidebar -->
+        <div class="sidebar">
+            <!-- Quote -->
+            <div class="quote-card fade-up fade-up-d1">
+                <div class="quote-mark">"</div>
+                <div class="quote-text">{{ quote.text }}</div>
+                <div class="quote-author">— {{ quote.author }}</div>
+            </div>
+
+            <!-- Donut Chart -->
+            <div class="mini-chart-card fade-up fade-up-d2">
+                <div class="mini-chart-title">Status Breakdown</div>
+                <canvas id="donutChart" height="180"></canvas>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="heatmap-card fade-up fade-up-d3">
+                <div class="section-header" style="margin-bottom:0.75rem">
+                    <div class="mini-chart-title" style="margin:0">Activity Heatmap</div>
+                    <span style="font-size:0.72rem;color:var(--text3)">Last 12 weeks</span>
+                </div>
+                <div class="heatmap-grid" id="heatmapGrid"></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:0.75rem;font-size:0.7rem;color:var(--text3)">
+                    Less
+                    <div style="width:10px;height:10px;border-radius:2px;background:var(--bg3)"></div>
+                    <div style="width:10px;height:10px;border-radius:2px;background:rgba(94,234,212,0.2)"></div>
+                    <div style="width:10px;height:10px;border-radius:2px;background:rgba(94,234,212,0.5)"></div>
+                    <div style="width:10px;height:10px;border-radius:2px;background:var(--accent)"></div>
+                    More
+                </div>
+            </div>
+
+            <!-- Quick Log -->
+            <div class="add-habit-card fade-up fade-up-d4">
+                <div class="mini-chart-title">Quick Links</div>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.25rem">
+                    <a href="/analytics" class="btn btn-secondary btn-sm" style="justify-content:flex-start">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        View Analytics
+                    </a>
+                    <a href="/export" class="btn btn-secondary btn-sm" style="justify-content:flex-start">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Export CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADD HABIT MODAL -->
+<div class="modal-overlay" id="addHabitModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Add New Habit</div>
+            <button class="modal-close" onclick="closeModal('addHabitModal')">✕</button>
+        </div>
+        <form action="/habit/add" method="POST">
+            <div class="form-group">
+                <label>Habit Name</label>
+                <input type="text" name="name" placeholder="e.g. Morning meditation" required maxlength="80">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Frequency</label>
+                    <select name="frequency">
+                        {% for freq in frequencies %}
+                        <option value="{{ freq }}">{{ freq }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Pick an Icon</label>
+                <div class="icon-grid" id="iconGrid">
+                    {% set icons = ['⭐','💪','🧘','📚','💧','🏃','🥗','😴','🎯','✍️','🎸','💻','🌿','🧠','🦷','☀️','🏋️','🚴'] %}
+                    {% for icon in icons %}
+                    <div class="icon-option {% if loop.first %}selected{% endif %}"
+                        onclick="selectIcon('{{ icon }}', this)">{{ icon }}</div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="icon" id="selectedIcon" value="⭐">
+            </div>
+            <div class="form-group">
+                <label>Pick a Color</label>
+                <div class="color-grid" id="colorGrid">
+                    {% for color in colors %}
+                    <div class="color-swatch {% if loop.first %}selected{% endif %}"
+                        style="background:{{ color }}"
+                        onclick="selectColor('{{ color }}', this)"></div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="color" id="selectedColor" value="{{ colors[0] }}">
+            </div>
+            <div style="display:flex;gap:0.75rem;margin-top:1rem">
+                <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal('addHabitModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="flex:2">Add Habit ✓</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:360px">
+        <div class="modal-header">
+            <div class="modal-title">Remove Habit</div>
+            <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+        </div>
+        <p style="color:var(--text2);font-size:0.9rem;margin-bottom:1.25rem">
+            Remove "<span id="deleteHabitName" style="color:var(--text);font-weight:600"></span>"?
+            All logs will be preserved in your history.
+        </p>
+        <div style="display:flex;gap:0.75rem">
+            <button class="btn btn-secondary" style="flex:1" onclick="closeModal('deleteModal')">Cancel</button>
+            <button class="btn btn-danger" style="flex:1" id="deleteConfirmBtn">Remove</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HEATMAP_DATA = {{ heatmap|safe }};
+const COMPLETION_PCT = {{ completion_pct }};
+const DONE_TODAY = {{ done_today }};
+const TOTAL_HABITS = {{ total_habits }};
+
+// Date display
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+// Ring animation
+(function() {
+    const pct = COMPLETION_PCT;
+    const circ = 175.9;
+    const fill = document.getElementById('ringFill');
+    const pctEl = document.getElementById('ringPct');
+    const offset = circ - (circ * pct / 100);
+    setTimeout(() => {
+        fill.style.strokeDashoffset = offset;
+        if (pct >= 80) fill.style.stroke = 'var(--accent)';
+        else if (pct >= 50) fill.style.stroke = 'var(--accent2)';
+        else fill.style.stroke = 'var(--accent3)';
+    }, 200);
+    let current = 0;
+    const interval = setInterval(() => {
+        if (current >= pct) { clearInterval(interval); return; }
+        current = Math.min(current + 2, pct);
+        pctEl.textContent = Math.round(current) + '%';
+    }, 16);
+})();
+
+// Toggle habit
+async function toggleHabit(habitId) {
+    const res = await fetch('/api/toggle-habit', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({habit_id: habitId})
+    });
+    const data = await res.json();
+    if (data.success) {
+        const card = document.getElementById('habit-' + habitId);
+        const btn = document.getElementById('check-' + habitId);
+        const name = document.getElementById('hname-' + habitId);
+        const done = data.status === 'done';
+        card.classList.toggle('done', done);
+        btn.classList.toggle('done', done);
+        btn.textContent = done ? '✓' : '○';
+        name.classList.toggle('crossed', done);
+        showToast(done ? '✓ Habit completed!' : 'Marked incomplete');
+        // Update streak display in the habit
+        const metaEl = card.querySelector('.habit-streak b');
+        if (metaEl) metaEl.textContent = data.streak;
+    }
+}
+
+// Delete
+let pendingDeleteId = null;
+function confirmDelete(id, name) {
+    pendingDeleteId = id;
+    document.getElementById('deleteHabitName').textContent = name;
+    openModal('deleteModal');
+}
+document.getElementById('deleteConfirmBtn').onclick = async function() {
+    if (!pendingDeleteId) return;
+    const res = await fetch(`/habit/delete/${pendingDeleteId}`, {method: 'POST'});
+    const data = await res.json();
+    if (data.success) {
+        const el = document.getElementById('habit-' + pendingDeleteId);
+        if (el) { el.style.opacity = '0'; el.style.transform = 'translateX(-10px)'; setTimeout(() => el.remove(), 300); }
+        closeModal('deleteModal');
+        showToast('Habit removed');
+    }
+};
+
+// Icon / color pickers
+function selectIcon(icon, el) {
+    document.querySelectorAll('.icon-option').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('selectedIcon').value = icon;
+}
+function selectColor(color, el) {
+    document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('selectedColor').value = color;
+}
+
+// Donut chart
+(async function() {
+    const res = await fetch('/api/chart-data');
+    const data = await res.json();
+    if (!data.labels.length) return;
+    const ctx = document.getElementById('donutChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: ['#5EEAD4', '#818CF8', '#F472B6', '#FBD260'],
+                borderWidth: 0, borderRadius: 4
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#8b95b0', font: { family: 'DM Sans', size: 11 }, padding: 12, boxWidth: 10, boxHeight: 10 }
+                }
+            }
+        }
+    });
+})();
+
+// Heatmap (12 weeks)
+(function() {
+    const grid = document.getElementById('heatmapGrid');
+    const today = new Date();
+    const WEEKS = 12;
+    const DAYS = WEEKS * 7;
+
+    for (let w = WEEKS - 1; w >= 0; w--) {
+        const col = document.createElement('div');
+        col.className = 'heatmap-col';
+        for (let d = 6; d >= 0; d--) {
+            const dt = new Date(today);
+            dt.setDate(today.getDate() - (w * 7 + d));
+            const key = dt.toISOString().split('T')[0];
+            const count = HEATMAP_DATA[key] || 0;
+            const cell = document.createElement('div');
+            cell.className = 'heatmap-cell';
+            if (count === 1) cell.classList.add('l1');
+            else if (count === 2) cell.classList.add('l2');
+            else if (count === 3) cell.classList.add('l3');
+            else if (count >= 4) cell.classList.add('l4');
+            cell.title = `${key}: ${count} completion${count !== 1 ? 's' : ''}`;
+            col.appendChild(cell);
+        }
+        grid.appendChild(col);
+    }
+})();
+</script>
+{% endblock %}
