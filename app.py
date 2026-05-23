@@ -7,12 +7,12 @@ import csv
 import random
 from io import StringIO, BytesIO
 import json
-
+ 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'habitflow_secret_2024')
-
+ 
 DB_PATH = os.environ.get('DB_PATH', 'habit_data.db')
-
+ 
 QUOTES = [
     {"text": "Success is the sum of small efforts repeated daily.", "author": "Robert Collier"},
     {"text": "Don't watch the clock; do what it does. Keep going.", "author": "Sam Levenson"},
@@ -29,16 +29,16 @@ QUOTES = [
     {"text": "Dream big, start small, act now.", "author": "Robin Sharma"},
     {"text": "Every master was once a disaster.", "author": "T. Harv Eker"},
 ]
-
+ 
 CATEGORIES = ["Health", "Fitness", "Learning", "Mindfulness", "Productivity", "Social", "Finance", "Creative", "Other"]
 FREQUENCIES = ["Daily", "Weekly", "Weekdays", "Weekends"]
 COLORS = ["#6EE7B7", "#93C5FD", "#F9A8D4", "#FCD34D", "#A78BFA", "#FB923C", "#34D399", "#60A5FA"]
-
+ 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
+ 
 def init_db():
     with get_db() as db:
         db.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -77,7 +77,7 @@ def init_db():
             longest_streak INTEGER DEFAULT 0,
             last_active TEXT
         )''')
-
+ 
 def login_required(f):
     from functools import wraps
     @wraps(f)
@@ -86,10 +86,10 @@ def login_required(f):
             return redirect('/login')
         return f(*args, **kwargs)
     return decorated
-
+ 
 def get_random_quote():
     return random.choice(QUOTES)
-
+ 
 def calculate_habit_streak(habit_id, user_id):
     db = get_db()
     logs = db.execute("""
@@ -97,14 +97,14 @@ def calculate_habit_streak(habit_id, user_id):
         WHERE habit_id=? AND user_id=? AND status='done'
         ORDER BY logged_date DESC
     """, (habit_id, user_id)).fetchall()
-
+ 
     if not logs:
         return 0
-
+ 
     streak = 0
     today = date.today()
     expected = today
-
+ 
     for row in logs:
         log_date = datetime.strptime(row['logged_date'], '%Y-%m-%d').date()
         if log_date == expected or (streak == 0 and log_date == today - timedelta(days=1)):
@@ -114,9 +114,9 @@ def calculate_habit_streak(habit_id, user_id):
             expected = expected - timedelta(days=1)
         else:
             break
-
+ 
     return streak
-
+ 
 def calculate_completion_rate(habit_id, user_id, days=30):
     db = get_db()
     start_date = (date.today() - timedelta(days=days)).strftime('%Y-%m-%d')
@@ -125,7 +125,7 @@ def calculate_completion_rate(habit_id, user_id, days=30):
         WHERE habit_id=? AND user_id=? AND status='done' AND logged_date >= ?
     """, (habit_id, user_id, start_date)).fetchone()[0]
     return round((done / days) * 100, 1)
-
+ 
 def get_heatmap_data(user_id, days=365):
     db = get_db()
     start = (date.today() - timedelta(days=days)).strftime('%Y-%m-%d')
@@ -135,13 +135,13 @@ def get_heatmap_data(user_id, days=365):
         GROUP BY logged_date
     """, (user_id, start)).fetchall()
     return {row['logged_date']: row['count'] for row in rows}
-
+ 
 @app.route('/')
 def home():
     if 'user_id' in session:
         return redirect('/dashboard')
     return redirect('/login')
-
+ 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -160,7 +160,7 @@ def register():
         except sqlite3.IntegrityError:
             return render_template('register.html', error="Email already registered.")
     return render_template('register.html')
-
+ 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -175,12 +175,12 @@ def login():
         return render_template('login.html', error="Invalid email or password.")
     registered = request.args.get('registered')
     return render_template('login.html', registered=registered)
-
+ 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/login')
-
+ 
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -188,14 +188,14 @@ def dashboard():
     user_id = session['user_id']
     today = date.today().strftime('%Y-%m-%d')
     quote = get_random_quote()
-
+ 
     habits = db.execute("""
         SELECT h.*, 
             (SELECT COUNT(*) FROM habit_logs hl WHERE hl.habit_id=h.id AND hl.status='done' AND hl.logged_date=?) as done_today
         FROM habits h WHERE h.user_id=? AND h.archived=0
         ORDER BY h.created_at ASC
     """, (today, user_id)).fetchall()
-
+ 
     habit_data = []
     total_streak = 0
     for h in habits:
@@ -207,17 +207,17 @@ def dashboard():
             'frequency': h['frequency'], 'color': h['color'], 'icon': h['icon'],
             'done_today': h['done_today'], 'streak': streak, 'rate': rate
         })
-
+ 
     total_habits = len(habit_data)
     done_today = sum(1 for h in habit_data if h['done_today'])
     completion_pct = round((done_today / total_habits * 100) if total_habits else 0)
-
+ 
     total_done = db.execute("""
         SELECT COUNT(*) FROM habit_logs WHERE user_id=? AND status='done'
     """, (user_id,)).fetchone()[0]
-
+ 
     heatmap = get_heatmap_data(user_id, 365)
-
+ 
     return render_template('dashboard.html',
         username=session['username'], quote=quote,
         habits=habit_data, total_habits=total_habits,
@@ -225,9 +225,10 @@ def dashboard():
         total_done=total_done, total_streak=total_streak,
         heatmap=json.dumps(heatmap), today=today,
         categories=CATEGORIES, colors=COLORS,
-        frequencies=FREQUENCIES
+        frequencies=FREQUENCIES,
+        now_hour=datetime.now().hour
     )
-
+ 
 @app.route('/habit/add', methods=['POST'])
 @login_required
 def add_habit():
@@ -244,7 +245,7 @@ def add_habit():
         """, (session['user_id'], name, category, frequency, color, icon))
         db.commit()
     return redirect('/dashboard')
-
+ 
 @app.route('/habit/log', methods=['POST'])
 @login_required
 def log_habit():
@@ -254,11 +255,11 @@ def log_habit():
     notes = request.form.get('notes', '')
     mood = request.form.get('mood', 3)
     logged_date = request.form.get('logged_date', date.today().strftime('%Y-%m-%d'))
-
+ 
     existing = db.execute("""
         SELECT id FROM habit_logs WHERE habit_id=? AND user_id=? AND logged_date=?
     """, (habit_id, session['user_id'], logged_date)).fetchone()
-
+ 
     if existing:
         db.execute("""
             UPDATE habit_logs SET status=?, notes=?, mood=? WHERE id=?
@@ -270,7 +271,7 @@ def log_habit():
         """, (habit_id, session['user_id'], status, notes, mood, logged_date))
     db.commit()
     return jsonify({'success': True})
-
+ 
 @app.route('/habit/delete/<int:habit_id>', methods=['POST'])
 @login_required
 def delete_habit(habit_id):
@@ -278,13 +279,13 @@ def delete_habit(habit_id):
     db.execute("UPDATE habits SET archived=1 WHERE id=? AND user_id=?", (habit_id, session['user_id']))
     db.commit()
     return jsonify({'success': True})
-
+ 
 @app.route('/analytics')
 @login_required
 def analytics():
     db = get_db()
     user_id = session['user_id']
-
+ 
     habits = db.execute("SELECT * FROM habits WHERE user_id=? AND archived=0", (user_id,)).fetchall()
     habit_stats = []
     for h in habits:
@@ -297,7 +298,7 @@ def analytics():
             'color': h['color'], 'icon': h['icon'],
             'streak': streak, 'rate_30': rate_30, 'rate_7': rate_7, 'total': total
         })
-
+ 
     # Weekly data (last 8 weeks)
     weekly_data = []
     for i in range(7, -1, -1):
@@ -308,7 +309,7 @@ def analytics():
             AND logged_date BETWEEN ? AND ?
         """, (user_id, week_start, week_end)).fetchone()[0]
         weekly_data.append({'week': f"W{8-i}", 'count': count})
-
+ 
     # Category breakdown
     cat_data = db.execute("""
         SELECT h.category, COUNT(hl.id) as count
@@ -316,16 +317,16 @@ def analytics():
         WHERE h.user_id=? AND h.archived=0
         GROUP BY h.category
     """, (user_id,)).fetchall()
-
+ 
     # Mood trend (last 30 days)
     mood_data = db.execute("""
         SELECT logged_date, AVG(mood) as avg_mood FROM habit_logs
         WHERE user_id=? AND logged_date >= ?
         GROUP BY logged_date ORDER BY logged_date
     """, (user_id, (date.today() - timedelta(days=30)).strftime('%Y-%m-%d'))).fetchall()
-
+ 
     heatmap = get_heatmap_data(user_id, 365)
-
+ 
     return render_template('analytics.html',
         username=session['username'],
         habit_stats=habit_stats,
@@ -334,7 +335,7 @@ def analytics():
         mood_data=json.dumps([{'date': r['logged_date'], 'mood': round(r['avg_mood'], 2)} for r in mood_data]),
         heatmap=json.dumps(heatmap)
     )
-
+ 
 @app.route('/export')
 @login_required
 def export():
@@ -345,7 +346,7 @@ def export():
         FROM habit_logs hl JOIN habits h ON hl.habit_id=h.id
         WHERE hl.user_id=? ORDER BY hl.logged_date DESC
     """, (user_id,)).fetchall()
-
+ 
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(['Habit', 'Category', 'Status', 'Notes', 'Mood (1-5)', 'Date'])
@@ -354,7 +355,7 @@ def export():
     output.seek(0)
     return send_file(BytesIO(output.getvalue().encode()), mimetype='text/csv',
                      as_attachment=True, download_name=f'habitflow_export_{date.today()}.csv')
-
+ 
 @app.route('/api/chart-data')
 @login_required
 def chart_data():
@@ -365,7 +366,7 @@ def chart_data():
         WHERE user_id=? GROUP BY status
     """, (user_id,)).fetchall()
     return jsonify({'labels': [r['status'] for r in results], 'values': [r['count'] for r in results]})
-
+ 
 @app.route('/api/toggle-habit', methods=['POST'])
 @login_required
 def toggle_habit():
@@ -373,11 +374,11 @@ def toggle_habit():
     habit_id = data['habit_id']
     today = date.today().strftime('%Y-%m-%d')
     db = get_db()
-
+ 
     existing = db.execute("""
         SELECT id, status FROM habit_logs WHERE habit_id=? AND user_id=? AND logged_date=?
     """, (habit_id, session['user_id'], today)).fetchone()
-
+ 
     if existing and existing['status'] == 'done':
         db.execute("UPDATE habit_logs SET status='skipped' WHERE id=?", (existing['id'],))
         new_status = 'skipped'
@@ -390,11 +391,11 @@ def toggle_habit():
             VALUES (?, ?, 'done', ?)
         """, (habit_id, session['user_id'], today))
         new_status = 'done'
-
+ 
     db.commit()
     streak = calculate_habit_streak(habit_id, session['user_id'])
     return jsonify({'success': True, 'status': new_status, 'streak': streak})
-
+ 
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)
