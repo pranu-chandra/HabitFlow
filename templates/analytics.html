@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Analytics — HabitFlow{% endblock %}
+
+{% block extra_head %}
+<style>
+.analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.5rem; }
+@media (max-width: 768px) { .analytics-grid { grid-template-columns: 1fr; } }
+.chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; }
+.chart-card-title { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; }
+.habit-stat-row {
+    display: flex; align-items: center; gap: 1rem; padding: 0.9rem 1rem;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    transition: border-color 0.2s;
+}
+.habit-stat-row:hover { border-color: var(--border2); }
+.habit-stat-icon { font-size: 1.4rem; }
+.habit-stat-info { flex: 1; min-width: 0; }
+.habit-stat-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.habit-stat-meta { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+.habit-stat-values { display: flex; align-items: center; gap: 1.25rem; text-align: right; }
+.stat-pill { display: flex; flex-direction: column; }
+.stat-pill-val { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; }
+.stat-pill-lbl { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+.heatmap-full { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+.heatmap-cell { width: 12px; height: 12px; border-radius: 2px; background: var(--bg3); flex-shrink: 0; cursor: pointer; }
+.heatmap-cell.l1 { background: rgba(94,234,212,0.2); }
+.heatmap-cell.l2 { background: rgba(94,234,212,0.45); }
+.heatmap-cell.l3 { background: rgba(94,234,212,0.7); }
+.heatmap-cell.l4 { background: var(--accent); }
+.top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+.page-title { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; }
+.page-sub { font-size: 0.85rem; color: var(--text3); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="top-bar fade-up">
+        <div>
+            <div class="page-title">Analytics</div>
+            <div class="page-sub">Your habit performance at a glance</div>
+        </div>
+        <a href="/export" class="btn btn-secondary btn-sm">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Export CSV
+        </a>
+    </div>
+
+    <!-- Habit Stats Table -->
+    <div class="section-header fade-up fade-up-d1">
+        <div class="section-title">Per-Habit Performance</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1.5rem" class="fade-up fade-up-d2">
+        {% if habit_stats %}
+            {% for h in habit_stats %}
+            <div class="habit-stat-row">
+                <div class="habit-stat-icon">{{ h.icon }}</div>
+                <div class="habit-stat-info">
+                    <div class="habit-stat-name">{{ h.name }}</div>
+                    <div class="habit-stat-meta">{{ h.category }}</div>
+                </div>
+                <div class="habit-stat-values">
+                    <div class="stat-pill">
+                        <div class="stat-pill-val" style="color:var(--gold)">{{ h.streak }}</div>
+                        <div class="stat-pill-lbl">streak</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-val" style="color:var(--accent2)">{{ h.rate_7 }}%</div>
+                        <div class="stat-pill-lbl">7-day</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-val" style="color:var(--accent)">{{ h.rate_30 }}%</div>
+                        <div class="stat-pill-lbl">30-day</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-val" style="color:var(--text)">{{ h.total }}</div>
+                        <div class="stat-pill-lbl">total</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="color:var(--text3);text-align:center;padding:2rem;font-size:0.9rem">No habit data yet. Start logging habits from the dashboard!</div>
+        {% endif %}
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="analytics-grid fade-up fade-up-d3">
+        <div class="chart-card">
+            <div class="chart-card-title">Weekly Completions (Last 8 Weeks)</div>
+            <canvas id="weeklyChart" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+            <div class="chart-card-title">Category Breakdown</div>
+            <canvas id="categoryChart" height="200"></canvas>
+        </div>
+        <div class="chart-card" style="grid-column:1/-1">
+            <div class="chart-card-title">Average Mood Trend (Last 30 Days)</div>
+            <canvas id="moodChart" height="120"></canvas>
+        </div>
+    </div>
+
+    <!-- Heatmap Full Year -->
+    <div class="chart-card fade-up fade-up-d4" style="margin-top:1.25rem">
+        <div class="chart-card-title">Activity Heatmap — Past Year</div>
+        <div class="heatmap-full" id="heatmapFull"></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:0.75rem;font-size:0.72rem;color:var(--text3)">
+            Less
+            <div style="width:11px;height:11px;border-radius:2px;background:var(--bg3)"></div>
+            <div style="width:11px;height:11px;border-radius:2px;background:rgba(94,234,212,0.2)"></div>
+            <div style="width:11px;height:11px;border-radius:2px;background:rgba(94,234,212,0.5)"></div>
+            <div style="width:11px;height:11px;border-radius:2px;background:var(--accent)"></div>
+            More
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const WEEKLY_DATA = {{ weekly_data|safe }};
+const CAT_DATA = {{ cat_data|safe }};
+const MOOD_DATA = {{ mood_data|safe }};
+const HEATMAP_DATA = {{ heatmap|safe }};
+
+const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#8b95b0', font: { family: 'DM Sans', size: 11 } } } }
+};
+
+// Weekly bar chart
+new Chart(document.getElementById('weeklyChart'), {
+    type: 'bar',
+    data: {
+        labels: WEEKLY_DATA.map(w => w.week),
+        datasets: [{
+            data: WEEKLY_DATA.map(w => w.count),
+            backgroundColor: 'rgba(94,234,212,0.2)',
+            borderColor: '#5EEAD4',
+            borderWidth: 2, borderRadius: 6, borderSkipped: false
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: { ticks: { color: '#4a5268' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { ticks: { color: '#4a5268', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+
+// Category doughnut
+if (CAT_DATA.length) {
+    new Chart(document.getElementById('categoryChart'), {
+        type: 'doughnut',
+        data: {
+            labels: CAT_DATA.map(c => c.category),
+            datasets: [{
+                data: CAT_DATA.map(c => c.count),
+                backgroundColor: ['#5EEAD4','#818CF8','#F472B6','#FBD260','#34D399','#60A5FA','#FB923C','#A78BFA'],
+                borderWidth: 0, borderRadius: 4
+            }]
+        },
+        options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { color: '#8b95b0', font: { family: 'DM Sans', size: 11 }, boxWidth: 10, padding: 10 } } } }
+    });
+}
+
+// Mood line chart
+if (MOOD_DATA.length) {
+    new Chart(document.getElementById('moodChart'), {
+        type: 'line',
+        data: {
+            labels: MOOD_DATA.map(m => m.date),
+            datasets: [{
+                label: 'Avg Mood',
+                data: MOOD_DATA.map(m => m.mood),
+                borderColor: '#818CF8',
+                backgroundColor: 'rgba(129,140,248,0.1)',
+                fill: true, tension: 0.4, pointRadius: 3,
+                pointBackgroundColor: '#818CF8'
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ticks: { color: '#4a5268', maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { min: 1, max: 5, ticks: { color: '#4a5268', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Full year heatmap (52 weeks)
+(function() {
+    const grid = document.getElementById('heatmapFull');
+    const today = new Date();
+    const WEEKS = 52;
+    for (let w = WEEKS - 1; w >= 0; w--) {
+        const col = document.createElement('div');
+        col.className = 'heatmap-col';
+        for (let d = 6; d >= 0; d--) {
+            const dt = new Date(today);
+            dt.setDate(today.getDate() - (w * 7 + d));
+            const key = dt.toISOString().split('T')[0];
+            const count = HEATMAP_DATA[key] || 0;
+            const cell = document.createElement('div');
+            cell.className = 'heatmap-cell';
+            if (count === 1) cell.classList.add('l1');
+            else if (count === 2) cell.classList.add('l2');
+            else if (count === 3) cell.classList.add('l3');
+            else if (count >= 4) cell.classList.add('l4');
+            cell.title = `${key}: ${count}`;
+            col.appendChild(cell);
+        }
+        grid.appendChild(col);
+    }
+})();
+</script>
+{% endblock %}
